@@ -11,21 +11,18 @@ using IslandSurvival.Weather;
 using IslandSurvival.UI;
 using IslandSurvival.SaveSystem;
 using IslandSurvival.Audio;
+using IslandSurvival.Visual;
 
 namespace IslandSurvival.Bootstrap
 {
-    /// <summary>
-    /// Entry point for GameWorld scene. Builds the full playable experience at runtime
-    /// so the project opens cleanly without missing scene references.
-    /// </summary>
     public class GameWorldBootstrap : MonoBehaviour
     {
-        [Header("Generation")]
         public int islandSeed = 42;
         public float dayLengthSeconds = 600f;
 
         void Start()
         {
+            VisualAssetFactory.Ensure();
             EnsureCore();
             var island = BuildIsland();
             var player = BuildPlayer(island);
@@ -37,7 +34,7 @@ namespace IslandSurvival.Bootstrap
             if (GameManager.Instance != null && !GameManager.Instance.IsNewGame)
                 SaveSystem.SaveSystem.Instance?.LoadGame();
             else
-                GameEvents.Notify("Welcome to the island. Gather resources. Survive.");
+                GameEvents.Notify("Welcome to the island. Gather resources. Survive the night.");
 
             if (GameManager.Instance != null)
                 GameManager.Instance.SetState(GameState.Playing);
@@ -58,6 +55,9 @@ namespace IslandSurvival.Bootstrap
             var go = new GameObject("Island");
             var gen = go.AddComponent<IslandGenerator>();
             gen.seed = islandSeed;
+            gen.resolution = 160;
+            gen.size = 240f;
+            gen.height = 32f;
             gen.Generate();
             return gen;
         }
@@ -83,19 +83,26 @@ namespace IslandSurvival.Bootstrap
             camGo.transform.SetParent(player.transform);
             camGo.transform.localPosition = new Vector3(0f, 1.65f, 0f);
             var cam = camGo.AddComponent<Camera>();
-            cam.fieldOfView = 75f;
-            cam.nearClipPlane = 0.08f;
-            cam.farClipPlane = 400f;
+            cam.fieldOfView = 72f;
+            cam.nearClipPlane = 0.07f;
+            cam.farClipPlane = 320f;
+            cam.allowHDR = true;
+            cam.allowMSAA = true;
             camGo.tag = "MainCamera";
             camGo.AddComponent<AudioListener>();
+            camGo.AddComponent<AtmosphereController>();
 
             var fpc = player.AddComponent<FirstPersonController>();
             fpc.cameraPivot = camGo.transform;
+            fpc.mouseSensitivity = 1.55f;
+            fpc.walkSpeed = 4.3f;
+            fpc.sprintSpeed = 7.4f;
 
             player.AddComponent<SurvivalStats>();
             player.AddComponent<InventorySystem>();
             var interaction = player.AddComponent<InteractionSystem>();
             interaction.playerCamera = cam;
+            interaction.range = 3.4f;
 
             return player;
         }
@@ -108,52 +115,60 @@ namespace IslandSurvival.Bootstrap
 
         void BuildLightingAndAtmosphere()
         {
-            // Sun
             var sunGo = new GameObject("Sun");
             var sun = sunGo.AddComponent<Light>();
             sun.type = LightType.Directional;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.85f;
-            sun.intensity = 1.1f;
+            sun.shadowStrength = 0.8f;
+            sun.shadowBias = 0.04f;
+            sun.intensity = 1.2f;
             sun.color = new Color(1f, 0.96f, 0.88f);
-            sunGo.transform.rotation = Quaternion.Euler(50f, 40f, 0f);
+            sunGo.transform.rotation = Quaternion.Euler(50f, 35f, 0f);
+
+            var moonGo = new GameObject("Moon");
+            var moon = moonGo.AddComponent<Light>();
+            moon.type = LightType.Directional;
+            moon.shadows = LightShadows.None;
+            moon.intensity = 0.05f;
+            moon.color = new Color(0.55f, 0.65f, 0.95f);
 
             var day = sunGo.AddComponent<DayNightCycle>();
             day.sun = sun;
+            day.moon = moon;
             day.dayLengthSeconds = dayLengthSeconds;
             day.timeOfDay = 0.28f;
             day.Apply();
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.0045f;
-            RenderSettings.fogColor = new Color(0.55f, 0.72f, 0.85f);
+            RenderSettings.fogDensity = 0.0042f;
+            RenderSettings.fogColor = new Color(0.55f, 0.72f, 0.88f);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.4f, 0.45f, 0.5f);
+            RenderSettings.ambientLight = new Color(0.42f, 0.48f, 0.52f);
 
-            // Sky-ish solid background
-            Camera.main.clearFlags = CameraClearFlags.SolidColor;
-            Camera.main.backgroundColor = new Color(0.45f, 0.7f, 0.95f);
+            if (Camera.main != null)
+            {
+                Camera.main.clearFlags = CameraClearFlags.SolidColor;
+                Camera.main.backgroundColor = new Color(0.45f, 0.72f, 0.92f);
+            }
 
-            // Weather + rain particles
             var weatherGo = new GameObject("Weather");
             var weather = weatherGo.AddComponent<WeatherSystem>();
             var rainGo = new GameObject("Rain");
             rainGo.transform.SetParent(weatherGo.transform);
             var ps = rainGo.AddComponent<ParticleSystem>();
             var main = ps.main;
-            main.startSpeed = 12f;
-            main.startSize = 0.05f;
-            main.startLifetime = 1.2f;
-            main.maxParticles = 2000;
-            main.startColor = new Color(0.7f, 0.8f, 0.95f, 0.6f);
+            main.startSpeed = 14f;
+            main.startSize = 0.04f;
+            main.startLifetime = 1.1f;
+            main.maxParticles = 2500;
+            main.startColor = new Color(0.75f, 0.85f, 0.95f, 0.55f);
             var emission = ps.emission;
             emission.rateOverTime = 0;
             var shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Box;
-            shape.scale = new Vector3(40f, 1f, 40f);
+            shape.scale = new Vector3(50f, 1f, 50f);
             rainGo.transform.position = new Vector3(0f, 25f, 0f);
-            // Follow player roughly
             rainGo.AddComponent<RainFollow>();
             weather.rain = ps;
         }
@@ -176,7 +191,7 @@ namespace IslandSurvival.Bootstrap
             var p = FirstPersonController.Instance;
             if (p == null) return;
             var pos = p.transform.position;
-            pos.y += 20f;
+            pos.y += 22f;
             transform.position = pos;
         }
     }

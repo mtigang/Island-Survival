@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using IslandSurvival.Visual;
 
 namespace IslandSurvival.Core
 {
@@ -59,12 +60,25 @@ namespace IslandSurvival.Core
 
         Sprite MakeIcon(Color c)
         {
-            var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
-            var pixels = new Color[32 * 32];
-            for (int i = 0; i < pixels.Length; i++) pixels[i] = c;
+            VisualAssetFactory.Ensure();
+            // Prefer shared procedural icons when color matches known items — fallback solid
+            var tex = new Texture2D(48, 48, TextureFormat.RGBA32, false);
+            float mid = 23.5f;
+            var pixels = new Color[48 * 48];
+            for (int y = 0; y < 48; y++)
+            for (int x = 0; x < 48; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x, y), new Vector2(mid, mid)) / 20f;
+                if (d > 1f) pixels[y * 48 + x] = Color.clear;
+                else
+                {
+                    float shade = 0.85f + (1f - d) * 0.3f;
+                    pixels[y * 48 + x] = new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
+                }
+            }
             tex.SetPixels(pixels);
             tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
+            return Sprite.Create(tex, new Rect(0, 0, 48, 48), new Vector2(0.5f, 0.5f));
         }
 
         public ItemDefinition Get(string id)

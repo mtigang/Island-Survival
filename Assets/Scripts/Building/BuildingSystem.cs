@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using IslandSurvival.Core;
 using IslandSurvival.Inventory;
+using IslandSurvival.Visual;
 
 namespace IslandSurvival.Building
 {
@@ -135,8 +136,11 @@ namespace IslandSurvival.Building
             };
             go.transform.localScale = scale;
             var r = go.GetComponent<Renderer>();
-            r.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-            r.material.color = id == "campfire" ? new Color(0.35f, 0.2f, 0.1f) : new Color(0.45f, 0.28f, 0.12f);
+            VisualAssetFactory.Ensure();
+            if (id == "campfire")
+                r.material = VisualAssetFactory.MakeLit(new Color(0.35f, 0.2f, 0.1f), VisualAssetFactory.Wood, 0.15f);
+            else
+                r.material = VisualAssetFactory.MakeLit(new Color(0.48f, 0.3f, 0.14f), VisualAssetFactory.Wood, 0.28f);
             if (preview)
             {
                 SetTransparent(r.material);
